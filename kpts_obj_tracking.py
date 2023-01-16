@@ -15,7 +15,7 @@ from sort.sort import *
 
 @torch.no_grad()
 def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view_img=False,
-        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False):
+        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, rmbg=True):
 
     frame_count = 0  #count no of frames
     total_fps = 0  #count total fps
@@ -47,7 +47,8 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         vid_write_image = letterbox(cap.read()[1], (frame_width), stride=64, auto=True)[0] #init videowriter
         resize_height, resize_width = vid_write_image.shape[:2]
         out_video_name = f"{source.split('/')[-1].split('.')[0]}"
-        out = cv2.VideoWriter(f"{source}_keypoint.mp4",
+        # f"{source}_keypoint.mp4"
+        out = cv2.VideoWriter(out_video_name,
                             cv2.VideoWriter_fourcc(*'mp4v'), 30,
                             (resize_width, resize_height))
 
@@ -87,6 +88,10 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 im0 = cv2.cvtColor(im0, cv2.COLOR_RGB2BGR) #reshape image format to (BGR)
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
 
+                if rmbg:
+                    wr_im = np.ones((frame_height, frame_width, 3), dtype=np.uint8)
+                    wr_im = 255*wr_im
+
                 for i, pose in enumerate(output_data):  # detections per image
                 
                     if len(output_data):  #check if no pose
@@ -110,8 +115,13 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                         for det_index, (*xyxy, idx) in enumerate(tracked_dets):
                             c = 0
                             kpts = pose[det_index, 6:]
-                            draw_bbox_kpts(im0, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3, orig_shape=im0.shape[:2])
-
+                            #draw_bbox_kpts(im0, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3, orig_shape=im0.shape[:2])
+                            if rmbg:
+                                draw_bbox_kpts(wr_im, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3,
+                                           orig_shape=im0.shape[:2])
+                            else:
+                                draw_bbox_kpts(im0, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3,
+                                            orig_shape=im0.shape[:2])
                 
                 end_time = time.time()  #Calculatio for FPS
                 fps = 1 / (end_time - start_time)
@@ -123,10 +133,15 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 
                 # Stream results
                 if view_img:
-                    cv2.imshow("YOLOv7 Pose Estimation Demo", im0)
-                    cv2.waitKey(1)  # 1 millisecond
-
-                out.write(im0)  #writing the video frame
+                    # cv2.imshow("keypoints with tracking", im0)
+                    if rmbg:
+                        cv2.imshow("keypoints with tracking", wr_im)
+                        cv2.waitKey(1)  # 1 millisecond
+                        out.write(wr_im)
+                    else:
+                        cv2.imshow("keypoints with tracking", im0)
+                        cv2.waitKey(1)  # 1 millisecond
+                        out.write(im0)
 
             else:
                 break
@@ -148,10 +163,11 @@ def parse_opt():
     parser.add_argument('--view-img', action='store_true', default=True, help='display results')  #display results
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels') #save confidence in txt writing
     parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)') #box linethickness
-    parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels') #box hidelabel
+    parser.add_argument('--hide-labels', default=True, action='store_true', help='hide labels') #box hidelabel
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences') #boxhideconf
     parser.add_argument('--track', default=True, action='store_true', help='run tracking')
-    parser.add_argument('--nobbox', default=False, action='store_true', help='hide bbox')
+    parser.add_argument('--nobbox', default=True, action='store_true', help='hide bbox')
+    parser.add_argument('--rmbg', default=True, action='store_true', help='white background')
     opt = parser.parse_args()
     return opt
 
