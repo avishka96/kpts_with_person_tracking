@@ -4,6 +4,7 @@ import torch
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from torchvision import transforms
 from utils.datasets import letterbox
 from utils.torch_utils import select_device
@@ -15,7 +16,7 @@ from sort.sort import *
 
 @torch.no_grad()
 def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view_img=False,
-        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, rmbg=True):
+        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, keep_bg=False):
 
     frame_count = 0  #count no of frames
     total_fps = 0  #count total fps
@@ -46,8 +47,10 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         
         vid_write_image = letterbox(cap.read()[1], (frame_width), stride=64, auto=True)[0] #init videowriter
         resize_height, resize_width = vid_write_image.shape[:2]
-        out_video_name = f"{source.split('/')[-1].split('.')[0]}"
-        # f"{source}_keypoint.mp4"
+        # out_video_name = f"{source.split('/')[-1].split('.')[0]}"
+        # out_video_name = str(Path(source).stem) + '_kpts.mp4'
+        out_video_name = str(os.path.splitext(source)[0]) + '_kpts.mp4'
+        print('Output video : {}'.format(out_video_name))
         out = cv2.VideoWriter(out_video_name,
                             cv2.VideoWriter_fourcc(*'mp4v'), 30,
                             (resize_width, resize_height))
@@ -88,7 +91,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 im0 = cv2.cvtColor(im0, cv2.COLOR_RGB2BGR) #reshape image format to (BGR)
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
 
-                if rmbg:
+                if not keep_bg:
                     wr_im = np.ones((frame_height, frame_width, 3), dtype=np.uint8)
                     wr_im = 255*wr_im
 
@@ -116,7 +119,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                             c = 0
                             kpts = pose[det_index, 6:]
                             #draw_bbox_kpts(im0, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3, orig_shape=im0.shape[:2])
-                            if rmbg:
+                            if not keep_bg:
                                 draw_bbox_kpts(wr_im, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3,
                                            orig_shape=im0.shape[:2])
                             else:
@@ -134,7 +137,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 # Stream results
                 if view_img:
                     # cv2.imshow("keypoints with tracking", im0)
-                    if rmbg:
+                    if not keep_bg:
                         cv2.imshow("keypoints with tracking", wr_im)
                         cv2.waitKey(1)  # 1 millisecond
                         out.write(wr_im)
@@ -167,7 +170,7 @@ def parse_opt():
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences') #boxhideconf
     parser.add_argument('--track', default=True, action='store_true', help='run tracking')
     parser.add_argument('--nobbox', default=True, action='store_true', help='hide bbox')
-    parser.add_argument('--rmbg', default=True, action='store_true', help='white background')
+    parser.add_argument('--keep_bg', default=False, action='store_true', help='white background')
     opt = parser.parse_args()
     return opt
 
