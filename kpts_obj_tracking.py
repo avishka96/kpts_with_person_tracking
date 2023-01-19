@@ -16,7 +16,7 @@ from sort.sort import *
 
 @torch.no_grad()
 def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view_img=False,
-        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, keep_bg=False):
+        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, keep_bg=False, out_fps=20):
 
     frame_count = 0  #count no of frames
     total_fps = 0  #count total fps
@@ -49,11 +49,11 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         resize_height, resize_width = vid_write_image.shape[:2]
         # out_video_name = f"{source.split('/')[-1].split('.')[0]}"
         # out_video_name = str(Path(source).stem) + '_kpts.mp4'
-        out_video_name = str(os.path.splitext(source)[0]) + '_kpts.mp4'
+        out_video_name = str(os.path.splitext(source)[0]) + '_kpts.avi'
         print('Output video : {}'.format(out_video_name))
         out = cv2.VideoWriter(out_video_name,
-                            cv2.VideoWriter_fourcc(*'mp4v'), 30,
-                            (resize_width, resize_height))
+                            cv2.VideoWriter_fourcc(*'MJPG'), out_fps,
+                            (frame_width, frame_height))
 
         while(cap.isOpened): #loop until cap opened or video not complete
         
@@ -92,8 +92,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
 
                 if not keep_bg:
-                    wr_im = np.ones((frame_height, frame_width, 3), dtype=np.uint8)
-                    wr_im = 255*wr_im
+                    wr_im = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
 
                 for i, pose in enumerate(output_data):  # detections per image
                 
@@ -150,7 +149,8 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 break
 
         cap.release()
-        # cv2.destroyAllWindows()
+        out.release()
+        cv2.destroyAllWindows()
         avg_fps = total_fps / frame_count
         print(f"Average FPS: {avg_fps:.3f}")
         
@@ -161,7 +161,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--poseweights', nargs='+', type=str, default='weights/yolov7-w6-pose.pt', help='model path(s)')
-    parser.add_argument('--source', type=str, default='inference/sample3.mp4', help='video/0 for webcam') #video source
+    parser.add_argument('--source', type=str, default='inference/hug_20fps.avi', help='video/0 for webcam') #video source
     parser.add_argument('--device', type=str, default='cpu', help='cpu/0,1,2,3(gpu)')   #device arugments
     parser.add_argument('--view-img', action='store_true', default=True, help='display results')  #display results
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels') #save confidence in txt writing
@@ -171,6 +171,7 @@ def parse_opt():
     parser.add_argument('--track', default=True, action='store_true', help='run tracking')
     parser.add_argument('--nobbox', default=True, action='store_true', help='hide bbox')
     parser.add_argument('--keep_bg', default=False, action='store_true', help='white background')
+    parser.add_argument('--out_fps', default=20, type=int, help='fps value')
     opt = parser.parse_args()
     return opt
 
