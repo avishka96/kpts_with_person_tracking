@@ -17,7 +17,7 @@ if __name__ == '__main__':
             if ext == '.mp4' or ext == '.avi':
                 vidpath = os.path.abspath(os.path.join(root, file))
                 print("Downsampling {}".format(vidpath))
-                change_fps(vidpath, 20, ext)
+                change_fps(vidpath, 15, ext)
                 print("Generating pose video for {}".format(vidpath))
                 command = "python kpts_obj_tracking.py --source {}".format(str(os.path.splitext(vidpath)[0])+'_20fps{}'.format(ext))
                 os.system(command)

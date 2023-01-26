@@ -1,3 +1,5 @@
+import os.path
+
 import cv2
 import time
 import torch
@@ -18,7 +20,8 @@ from sort.sort import *
 
 @torch.no_grad()
 def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view_img=False,
-        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, keep_bg=False, out_fps=20):
+        save_conf=False,line_thickness = 3,hide_labels=False, hide_conf=True, track=True, nobbox=False, keep_bg=False,
+        out_fps=20, outvid_dir='output/videos/', outjson_dir='output/jsons/'):
 
     frame_count = 0  #count no of frames
     total_fps = 0  #count total fps
@@ -51,10 +54,10 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         
         vid_write_image = letterbox(cap.read()[1], (frame_width), stride=64, auto=True)[0] #init videowriter
         resize_height, resize_width = vid_write_image.shape[:2]
-        # out_video_name = f"{source.split('/')[-1].split('.')[0]}"
-        # out_video_name = str(Path(source).stem) + '_kpts.mp4'
-        out_video_name = str(os.path.splitext(source)[0]) + '_kpts.avi'
-        out_json_name = str(os.path.splitext(source)[0]) + '_kpts.json'
+        out_video_name = outvid_dir + str(os.path.splitext(source)[0]) + '_kpts.avi'
+        create_dir_struct(os.path.split(out_video_name)[0])   # Create vid dir if missings
+        out_json_name =  outjson_dir + str(os.path.splitext(source)[0]) + '_kpts.json'
+        create_dir_struct(os.path.split(out_json_name)[0])    # Create json dir if missings
         print('Output video : {}'.format(out_video_name))
         out = cv2.VideoWriter(out_video_name,
                             cv2.VideoWriter_fourcc(*'MJPG'), out_fps,
@@ -106,23 +109,16 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                             n = (pose[:, 5] == c).sum()  # detections per class
                             print("No of Objects in Current Frame : {}".format(n))
 
-                        #print("before pose array\n", pose)
                         ## Tracker
                         dets_to_sort = np.empty((0, 6))
                         for x1, y1, x2, y2, conf, detclass in pose[:, :6].cpu().detach().numpy():
                             dets_to_sort = np.vstack((dets_to_sort,
                                                       np.array([x1, y1, x2, y2, conf, detclass])))
-                        #print("dets to sort\n", dets_to_sort)
 
                         if opt.track:
-                            print("pose input\n", dets_to_sort)
                             tracked_dets = sort_tracker.update(dets_to_sort)    # add option unique_track_color later
-                            #tracks = sort_tracker.getTrackers()
-                            print("tracked dets\n", tracked_dets)
-                            #print("after pose array\n", pose)
 
                         arr_json = sort_tracks(dets_to_sort, tracked_dets, pose[:, 6:])
-                        print('array to json\n', arr_json)
 
                         update_dict(frame_count+1, dict_to_json, arr_json)
                         print('dict to json\n', dict_to_json)
@@ -130,9 +126,6 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                         for det_index, (*xyxy, idx) in enumerate(tracked_dets):
                             c = 0
                             kpts = pose[det_index, 6:]
-                            #print(kpts)
-                            #print('({},{})'.format(kpts[30], kpts[31]))
-                            #draw_bbox_kpts(im0, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3, orig_shape=im0.shape[:2])
                             if not keep_bg:
                                 draw_bbox_kpts(wr_im, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3,
                                            orig_shape=im0.shape[:2])
@@ -192,6 +185,8 @@ def parse_opt():
     parser.add_argument('--nobbox', default=True, action='store_true', help='hide bbox')
     parser.add_argument('--keep_bg', default=False, action='store_true', help='white background')
     parser.add_argument('--out_fps', default=20, type=int, help='fps value')
+    parser.add_argument('--outvid_dir', type=str, default='output/videos/', help='kpts video dir')
+    parser.add_argument('--outjson_dir', type=str, default='output/jsons/', help='kpts json dir')
     opt = parser.parse_args()
     return opt
 
@@ -268,6 +263,10 @@ def update_dict(frame, dict, arr=np.empty((0,56))):
         temp_dict = {"id": int(row[0]), "standing_loc": [(row[50] + row[53])/2, (row[51] + row[54])/2], "bbox": row[1:5].tolist(), "skeleton": row[5::].tolist()}
         person_list.append(temp_dict)
     dict[str(frame)] = person_list
+
+def create_dir_struct(dirpath):
+    if not os.path.exists(dirpath):
+        os.makedirs(dirpath)
 
 #main function
 def main(opt):
