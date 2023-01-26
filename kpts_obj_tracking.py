@@ -125,6 +125,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                         print('array to json\n', arr_json)
 
                         update_dict(frame_count+1, dict_to_json, arr_json)
+                        print('dict to json\n', dict_to_json)
 
                         for det_index, (*xyxy, idx) in enumerate(tracked_dets):
                             c = 0
@@ -264,7 +265,7 @@ def sort_tracks(detout=np.zeros((0,4)), trkout=np.zeros((0,5)), kpts=np.zeros((0
 def update_dict(frame, dict, arr=np.empty((0,56))):
     person_list = []
     for row in arr:
-        temp_dict = {"id": row[0], "standing_loc": [(row[50] + row[53])/2, (row[51] + row[54])/2], "bbox": row[1:5], "skeleton": row[5::]}
+        temp_dict = {"id": int(row[0]), "standing_loc": [(row[50] + row[53])/2, (row[51] + row[54])/2], "bbox": row[1:5].tolist(), "skeleton": row[5::].tolist()}
         person_list.append(temp_dict)
     dict[str(frame)] = person_list
 
