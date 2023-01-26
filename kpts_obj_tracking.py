@@ -5,7 +5,9 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+import json
 from torchvision import transforms
+import torchvision.ops.boxes as bops
 from utils.datasets import letterbox
 from utils.torch_utils import select_device
 from models.experimental import attempt_load
@@ -22,6 +24,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
     total_fps = 0  #count total fps
     time_list = []   #list to store time
     fps_list = []    #list to store fps
+    dict_to_json = {}
     
     device = select_device(opt.device) #select device
     half = device.type != 'cpu'
@@ -43,6 +46,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
     else:
         frame_width = int(cap.get(3))  #get video frame width
         frame_height = int(cap.get(4)) #get video frame height
+        print('video size = ({}*{})'.format(frame_width,frame_height))
 
         
         vid_write_image = letterbox(cap.read()[1], (frame_width), stride=64, auto=True)[0] #init videowriter
@@ -50,6 +54,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         # out_video_name = f"{source.split('/')[-1].split('.')[0]}"
         # out_video_name = str(Path(source).stem) + '_kpts.mp4'
         out_video_name = str(os.path.splitext(source)[0]) + '_kpts.avi'
+        out_json_name = str(os.path.splitext(source)[0]) + '_kpts.json'
         print('Output video : {}'.format(out_video_name))
         out = cv2.VideoWriter(out_video_name,
                             cv2.VideoWriter_fourcc(*'MJPG'), out_fps,
@@ -92,7 +97,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
 
                 if not keep_bg:
-                    wr_im = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
+                    wr_im = 255*np.ones((frame_height, frame_width, 3), dtype=np.uint8)
 
                 for i, pose in enumerate(output_data):  # detections per image
                 
@@ -101,22 +106,31 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                             n = (pose[:, 5] == c).sum()  # detections per class
                             print("No of Objects in Current Frame : {}".format(n))
 
-                        #print("pose array\n", reversed(pose[:,:6]))
+                        #print("before pose array\n", pose)
                         ## Tracker
                         dets_to_sort = np.empty((0, 6))
-                        for x1, y1, x2, y2, conf, detclass in reversed(pose[:, :6]).cpu().detach().numpy():
+                        for x1, y1, x2, y2, conf, detclass in pose[:, :6].cpu().detach().numpy():
                             dets_to_sort = np.vstack((dets_to_sort,
                                                       np.array([x1, y1, x2, y2, conf, detclass])))
-                        print("dets to sort\n", dets_to_sort)
+                        #print("dets to sort\n", dets_to_sort)
 
                         if opt.track:
+                            print("pose input\n", dets_to_sort)
                             tracked_dets = sort_tracker.update(dets_to_sort)    # add option unique_track_color later
                             #tracks = sort_tracker.getTrackers()
                             print("tracked dets\n", tracked_dets)
+                            #print("after pose array\n", pose)
+
+                        arr_json = sort_tracks(dets_to_sort, tracked_dets, pose[:, 6:])
+                        print('array to json\n', arr_json)
+
+                        update_dict(frame_count+1, dict_to_json, arr_json)
 
                         for det_index, (*xyxy, idx) in enumerate(tracked_dets):
                             c = 0
                             kpts = pose[det_index, 6:]
+                            #print(kpts)
+                            #print('({},{})'.format(kpts[30], kpts[31]))
                             #draw_bbox_kpts(im0, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3, orig_shape=im0.shape[:2])
                             if not keep_bg:
                                 draw_bbox_kpts(wr_im, xyxy, identity=idx, kpts=kpts, names=names, colors=colors, steps=3,
@@ -153,15 +167,20 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         cv2.destroyAllWindows()
         avg_fps = total_fps / frame_count
         print(f"Average FPS: {avg_fps:.3f}")
-        
+
+        # write to json file
+        json_object = json.dumps(dict_to_json, indent=4)
+        with open(out_json_name, "w") as jsonfile:
+            jsonfile.write(json_object)
+
         #plot the comparision graph
-        plot_fps_time_comparision(time_list=time_list,fps_list=fps_list)
+        #plot_fps_time_comparision(time_list=time_list,fps_list=fps_list)
 
 
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--poseweights', nargs='+', type=str, default='weights/yolov7-w6-pose.pt', help='model path(s)')
-    parser.add_argument('--source', type=str, default='inference/hug_20fps.avi', help='video/0 for webcam') #video source
+    parser.add_argument('--source', type=str, default='inference/test.mp4', help='video/0 for webcam') #video source
     parser.add_argument('--device', type=str, default='cpu', help='cpu/0,1,2,3(gpu)')   #device arugments
     parser.add_argument('--view-img', action='store_true', default=True, help='display results')  #display results
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels') #save confidence in txt writing
@@ -211,6 +230,43 @@ def draw_bbox_kpts(img, bbox, identity=None, category=None, confidence=None, kpt
 
     return img
 
+def sort_tracks(detout=np.zeros((0,4)), trkout=np.zeros((0,5)), kpts=np.zeros((0,51))):
+    matched_ind = []
+    sorted_trks = np.empty((0,56))
+    numdets = len(detout)
+    numtrks = len(trkout)
+    if numdets == 0:
+        print('No Detections')
+        return detout
+    elif numtrks == 0:
+        print('No tracks')
+        return trkout
+    else:
+        for i in range(numdets):
+            detbox = torch.tensor(np.reshape(detout[i, :4], (1,4)), dtype=torch.float)
+            iou = 0
+            iou_matched = False
+            for j in range(numtrks):
+                if j in matched_ind:
+                    continue
+                else:
+                    trkbox = torch.tensor(np.reshape(trkout[j, :4], (1,4)), dtype=torch.float)
+                    if ( bops.box_iou(detbox, trkbox)[0][0] > iou ):
+                        iou = bops.box_iou(detbox, trkbox)[0][0]
+                        matched_trk_idx = j
+                        iou_matched = True
+            if iou_matched:
+                matched_ind.append(matched_trk_idx)
+                matched_row = np.hstack((trkout[matched_trk_idx,4], trkout[matched_trk_idx,:4], kpts[i]))
+                sorted_trks = np.vstack((sorted_trks, matched_row))
+        return sorted_trks
+
+def update_dict(frame, dict, arr=np.empty((0,56))):
+    person_list = []
+    for row in arr:
+        temp_dict = {"id": row[0], "standing_loc": [(row[50] + row[53])/2, (row[51] + row[54])/2], "bbox": row[1:5], "skeleton": row[5::]}
+        person_list.append(temp_dict)
+    dict[str(frame)] = person_list
 
 #main function
 def main(opt):
