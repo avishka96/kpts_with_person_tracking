@@ -56,7 +56,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
         resize_height, resize_width = vid_write_image.shape[:2]
         out_video_name = outvid_dir + str(os.path.splitext(source)[0]) + '_kpts.avi'
         create_dir_struct(os.path.split(out_video_name)[0])   # Create vid dir if missings
-        out_json_name =  outjson_dir + str(os.path.splitext(source)[0]) + '_kpts.json'
+        out_json_name = outjson_dir + str(os.path.splitext(source)[0]) + '_kpts.json'
         create_dir_struct(os.path.split(out_json_name)[0])    # Create json dir if missings
         print('Output video : {}'.format(out_video_name))
         out = cv2.VideoWriter(out_video_name,
@@ -121,7 +121,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                         arr_json = sort_tracks(dets_to_sort, tracked_dets, pose[:, 6:])
 
                         update_dict(frame_count+1, dict_to_json, arr_json)
-                        print('dict to json\n', dict_to_json)
+                        #print('dict to json\n', dict_to_json)
 
                         for det_index, (*xyxy, idx) in enumerate(tracked_dets):
                             c = 0
@@ -153,6 +153,12 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
                         cv2.waitKey(1)  # 1 millisecond
                         out.write(im0)
 
+                else:
+                    if not keep_bg:
+                        out.write(wr_im)
+                    else:
+                        out.write(im0)
+
             else:
                 break
 
@@ -174,7 +180,7 @@ def run(poseweights="yolov7-w6-pose.pt",source="football1.mp4",device='cpu',view
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--poseweights', nargs='+', type=str, default='weights/yolov7-w6-pose.pt', help='model path(s)')
-    parser.add_argument('--source', type=str, default='inference/test.mp4', help='video/0 for webcam') #video source
+    parser.add_argument('--source', type=str, default='inference/test/test_15fps.mp4', help='video/0 for webcam') #video source
     parser.add_argument('--device', type=str, default='cpu', help='cpu/0,1,2,3(gpu)')   #device arugments
     parser.add_argument('--view-img', action='store_true', default=False, help='display results')  #display results
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels') #save confidence in txt writing
@@ -184,7 +190,7 @@ def parse_opt():
     parser.add_argument('--track', default=True, action='store_true', help='run tracking')
     parser.add_argument('--nobbox', default=True, action='store_true', help='hide bbox')
     parser.add_argument('--keep_bg', default=False, action='store_true', help='white background')
-    parser.add_argument('--out_fps', default=20, type=int, help='fps value')
+    parser.add_argument('--out_fps', default=15, type=int, help='fps value')
     parser.add_argument('--outvid_dir', type=str, default='output/videos/', help='kpts video dir')
     parser.add_argument('--outjson_dir', type=str, default='output/jsons/', help='kpts json dir')
     opt = parser.parse_args()
