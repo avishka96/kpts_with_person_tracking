@@ -502,8 +502,8 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
         if not (x_coord % 640 == 0 or y_coord % 640 == 0):
             if steps == 3:
                 conf = kpts[steps * kid + 2]
-                if conf < 0.5:
-                    continue
+                #if conf < 0.5:
+                    #continue
             cv2.circle(im, (int(x_coord), int(y_coord)), radius, (int(r), int(g), int(b)), -1)
 
     for sk_id, sk in enumerate(skeleton):
@@ -513,8 +513,8 @@ def plot_skeleton_kpts(im, kpts, steps, orig_shape=None):
         if steps == 3:
             conf1 = kpts[(sk[0]-1)*steps+2]
             conf2 = kpts[(sk[1]-1)*steps+2]
-            if conf1<0.5 or conf2<0.5:
-                continue
+            #if conf1<0.5 or conf2<0.5:
+                #continue
         if pos1[0]%640 == 0 or pos1[1]%640==0 or pos1[0]<0 or pos1[1]<0:
             continue
         if pos2[0] % 640 == 0 or pos2[1] % 640 == 0 or pos2[0]<0 or pos2[1]<0:

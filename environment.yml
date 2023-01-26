@@ -151,6 +151,7 @@ dependencies:
   - zstd=1.5.2
   - pip:
     - filterpy==1.4.5
+    - ffmpeg-python==0.2.0
     - imageio==2.24.0
     - networkx==3.0
     - numpy==1.24.1
@@ -159,4 +160,4 @@ dependencies:
     - scikit-image==0.19.3
     - thop==0.1.1-2209072238
     - tifffile==2022.10.10
-#prefix: C:\Users\avish\anaconda3\envs\int_loc
+#prefix: C:\Users\avish\anaconda3\envs\inter_local
