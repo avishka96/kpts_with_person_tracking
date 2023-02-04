@@ -1,13 +1,7 @@
-import ffmpeg
 import os
 import sys
 import argparse
 
-def change_fps(vid_loc, fps, format):
-    stream = ffmpeg.input(vid_loc)
-    stream = ffmpeg.filter(stream, 'fps', fps=fps, round='up')
-    stream = ffmpeg.output(stream, str(os.path.splitext(vid_loc)[0])+'_{}fps{}'.format(fps,format))
-    ffmpeg.run(stream)
 
 if __name__ == '__main__':
     dir = str(sys.argv[1])
@@ -20,10 +14,11 @@ if __name__ == '__main__':
                 vidpath = os.path.relpath(os.path.join(root, file))
                 print("[*] Video file = {}".format(vidpath))
                 print("[1/2] Downsampling video to {} fps".format(dwn_fps))
-                change_fps(vidpath, dwn_fps, ext)
+                fps_cmd = "ffmpeg -i {} -c:v libx264 -crf 0 -filter:v fps={} {}".format(vidpath, str(dwn_fps), str(os.path.splitext(vidpath)[0])+'_{}fps{}'.format(str(dwn_fps), ext))
+                os.system(fps_cmd)
                 print("[2/2] Generating skeletons")
-                command = "python kpts_obj_tracking.py --source {}".format(str(os.path.splitext(vidpath)[0])+'_{}fps{}'.format(dwn_fps, ext))
-                os.system(command)
+                py_cmd = "python kpts_obj_tracking.py --source {}".format(str(os.path.splitext(vidpath)[0])+'_{}fps{}'.format(dwn_fps, ext))
+                os.system(py_cmd)
                 print("[*] Skeletons generated\n")
                 vid_count += 1
     print("[*] Skeletons generated for {} videos".format(vid_count))
